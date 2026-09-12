@@ -11,3 +11,6 @@ selftest_save.dat
 .vs/
 .vscode/
 .idea/
+
+# Quadros gerados pelo modo record
+frames/

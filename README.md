@@ -12,13 +12,13 @@ em C# puro**, em ~1.000 linhas. Cada peça do aprendizado está visível no cód
 de chamar uma biblioteca que já resolve tudo. Veja o
 [roteiro de estudo](#roteiro-de-estudo) se você quer percorrer o mesmo caminho.
 
-```
-       /\            7 sensores  →  8 neurônios  →  2 ações
-      |  |           (altitude, velocidade, ângulo, combustível…)
-      |IA|                              ↓
-      /__\                    throttle  +  torque
-      ^^^^           60 foguetes por geração · seleção natural simulada
-```
+![O foguete decolando, subindo e pousando sozinho](docs/demo-voo.gif)
+
+<sub>**Ninguém está nos controles.** O melhor cérebro depois de 6.363 gerações:
+decola, sobe a 1.988 m, se vira de ponta-cabeça, freia a queda e pousa com 1,9 de
+combustível sobrando. À direita, a rede neural (7 sensores → 8 neurônios → 2
+ações) decidindo em tempo real — verde é peso positivo, vermelho negativo, e o
+brilho de cada bolinha é o quanto aquele neurônio está ativo naquele instante.</sub>
 
 ---
 
@@ -94,6 +94,21 @@ na próxima execução.
 ```bash
 dotnet run -- selftest 150        # evolui 150 gerações e imprime o progresso
 dotnet run -- selftest 150 42     # com outra seed aleatória
+```
+
+### Gravar um GIF
+
+Os GIFs deste README saíram do próprio jogo. A gravação roda com a janela oculta
+e só lê o treino salvo (nunca escreve nele):
+
+```bash
+# pasta  quadros  1-a-cada  largura  altura  modo
+dotnet run -- record frames 170 3 960 540 watch   # o melhor cérebro voando
+dotnet run -- record frames 190 3 960 540 train   # uma geração inteira
+
+# monta o GIF a partir dos PNGs
+ffmpeg -framerate 15 -i frames/f%04d.png -lavfi "fps=15,scale=760:-1:flags=lanczos,palettegen=stats_mode=diff" pal.png
+ffmpeg -framerate 15 -i frames/f%04d.png -i pal.png -lavfi "fps=15,scale=760:-1:flags=lanczos[x];[x][1:v]paletteuse=dither=bayer:bayer_scale=3" demo.gif
 ```
 
 ---
@@ -283,6 +298,12 @@ O resumo da lição, se você for escrever sua própria fitness:
 ---
 
 ## Resultados
+
+![Uma geração inteira sendo avaliada no modo treino](docs/demo-treino.gif)
+
+<sub>O modo treino (tecla `2`): os 60 foguetes da geração são lançados juntos, a
+câmera segue o mais alto, e ao fim do episódio o painel mostra quantos pousaram
+suave antes de gerar a população seguinte.</sub>
 
 Saída real de `dotnet run -- selftest 60` (seed padrão 7):
 

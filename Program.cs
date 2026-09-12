@@ -57,8 +57,32 @@ if (args.Length > 0 && args[0] == "selftest")
     return;
 }
 
+// ---------------------------------------------------------------------------
+//  Gravacao pro README:
+//    dotnet run -- record <pasta> [quadros] [pular] [larg] [alt] [train|watch]
+//  Salva um PNG a cada [pular] quadros e fecha sozinho. Usa janela oculta e
+//  NAO escreve em treino_ia.dat (so le). No modo "watch" a simulacao tambem
+//  roda acelerada, senao um voo completo nao caberia num GIF.
+// ---------------------------------------------------------------------------
+bool recording = args.Length > 0 && args[0] == "record";
+string recDir = "frames";
+int recWanted = 120, recSkip = 3, recW = 960, recH = 540;
+int recSaved = 0, recFrame = 0;
+string recMode = "train";
+if (recording)
+{
+    if (args.Length > 1) recDir = args[1];
+    if (args.Length > 2) recWanted = int.Parse(args[2]);
+    if (args.Length > 3) recSkip = int.Parse(args[3]);
+    if (args.Length > 4) recW = int.Parse(args[4]);
+    if (args.Length > 5) recH = int.Parse(args[5]);
+    if (args.Length > 6) recMode = args[6];
+    System.IO.Directory.CreateDirectory(recDir);
+}
+
 SetConfigFlags(ConfigFlags.ResizableWindow);
-InitWindow(startW, startH, "Foguete + IA");
+if (recording) SetConfigFlags(ConfigFlags.HiddenWindow);
+InitWindow(recording ? recW : startW, recording ? recH : startH, "Foguete + IA");
 SetTargetFPS(60);
 
 var rng = new Random();
@@ -73,7 +97,7 @@ for (int i = 0; i < stars.Length; i++)
     stars[i] = (starRng.Next(0, tileW), starRng.Next(0, tileH), (byte)starRng.Next(120, 255));
 
 // --- estado dos modos ---
-Mode mode = Mode.Manual;
+Mode mode = !recording ? Mode.Manual : (recMode == "watch" ? Mode.Watch : Mode.Train);
 
 // modo manual
 var player = new Rocket(rng);
@@ -108,6 +132,8 @@ void StartWatch()
 float uiScale = 1f;
 int Fs(float size) => Math.Max(12, (int)(size * uiScale)); // tamanho de fonte escalado
 void Txt(string s, float x, float y, float size, Color c) => DrawText(s, (int)x, (int)y, Fs(size), c);
+
+if (recording && mode == Mode.Watch) StartWatch();
 
 while (!WindowShouldClose())
 {
@@ -168,7 +194,7 @@ while (!WindowShouldClose())
             if (h >= 0) leaderIdx = h;
         }
         // salva automaticamente a cada 25 geracoes (nunca mais perde o treino!)
-        if (pop.Generation - lastSaveGen >= 25)
+        if (!recording && pop.Generation - lastSaveGen >= 25)
         {
             pop.Save(savePath);
             lastSaveGen = pop.Generation;
@@ -177,18 +203,24 @@ while (!WindowShouldClose())
     else // Watch
     {
         if (IsKeyPressed(KeyboardKey.R)) StartWatch();
-        if (!watchRocket.Landed)
+        // na gravacao roda em passo fixo e acelerado (igual ao modo treino)
+        int wSteps = recording ? stepsPerFrame : 1;
+        float wDt = recording ? 1f / 60f : dt;
+        for (int s = 0; s < wSteps; s++)
         {
-            BuildWatchInputs(watchRocket, watchInp);
-            watchBrain.Decide(watchInp, out float th, out float tq);
-            watchRocket.Throttle = th;
-            watchRocket.TorqueInput = tq;
-            watchRocket.Step(dt);
-        }
-        else
-        {
-            watchRespawn += dt;
-            if (watchRespawn > 2.5f) StartWatch(); // relanca sozinho
+            if (!watchRocket.Landed)
+            {
+                BuildWatchInputs(watchRocket, watchInp);
+                watchBrain.Decide(watchInp, out float th, out float tq);
+                watchRocket.Throttle = th;
+                watchRocket.TorqueInput = tq;
+                watchRocket.Step(wDt);
+            }
+            else
+            {
+                watchRespawn += wDt;
+                if (watchRespawn > 2.5f) StartWatch(); // relanca sozinho
+            }
         }
     }
 
@@ -249,9 +281,25 @@ while (!WindowShouldClose())
     Txt("1 Manual   2 Treino IA   3 Assistir   F tela cheia   R reinicia",
         20 * uiScale, sh - 30 * uiScale, 18, new Color(180, 180, 180, 255));
     EndDrawing();
+
+    if (recording)
+    {
+        if (recFrame % recSkip == 0)
+        {
+            // LoadImageFromScreen + ExportImage (e nao TakeScreenshot) porque
+            // o TakeScreenshot prefixa o diretorio de trabalho e recusa
+            // caminhos absolutos.
+            var shot = LoadImageFromScreen();
+            ExportImage(shot, System.IO.Path.Combine(recDir, $"f{recSaved:D4}.png"));
+            UnloadImage(shot);
+            recSaved++;
+        }
+        recFrame++;
+        if (recSaved >= recWanted) break;
+    }
 }
 
-pop.Save(savePath); // salva ao fechar a janela (ESC ou botao fechar)
+if (!recording) pop.Save(savePath); // salva ao fechar a janela (ESC ou botao fechar)
 CloseWindow();
 
 // ======================= funcoes locais =======================
