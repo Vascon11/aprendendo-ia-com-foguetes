@@ -1,0 +1,13 @@
+# Build do .NET
+bin/
+obj/
+*.user
+
+# Estado de treino gerado em runtime (recriado ao rodar o jogo)
+treino_ia.dat
+selftest_save.dat
+
+# Editores
+.vs/
+.vscode/
+.idea/
