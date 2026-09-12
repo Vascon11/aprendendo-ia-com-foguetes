@@ -7,6 +7,11 @@ do zero, a **decolar, subir e pousar sem explodir** — usando **neuroevolução
 Sem PyTorch, sem TensorFlow, sem NEAT-Python, sem dataset: **tudo escrito à mão
 em C# puro**, em ~1.000 linhas. Cada peça do aprendizado está visível no código.
 
+**Este é um projeto de estudo.** O objetivo não era fazer o melhor foguete — era
+*entender como se constrói uma IA do zero*, implementando cada peça à mão em vez
+de chamar uma biblioteca que já resolve tudo. Veja o
+[roteiro de estudo](#roteiro-de-estudo) se você quer percorrer o mesmo caminho.
+
 ```
        /\            7 sensores  →  8 neurônios  →  2 ações
       |  |           (altitude, velocidade, ângulo, combustível…)
@@ -19,6 +24,7 @@ em C# puro**, em ~1.000 linhas. Cada peça do aprendizado está visível no cód
 
 ## Índice
 
+- [Por que este projeto existe](#por-que-este-projeto-existe)
 - [Rodando o projeto](#rodando-o-projeto)
 - [Como a IA funciona](#como-a-ia-funciona)
   - [1. O cérebro: a rede neural](#1-o-cérebro-a-rede-neural)
@@ -29,8 +35,33 @@ em C# puro**, em ~1.000 linhas. Cada peça do aprendizado está visível no cód
 - [Como a IA foi desenvolvida](#como-a-ia-foi-desenvolvida-a-saga-do-fitness)
 - [Resultados](#resultados)
 - [Arquitetura do código](#arquitetura-do-código)
+- [Roteiro de estudo](#roteiro-de-estudo)
 - [Quer mexer?](#quer-mexer)
 - [Prior art](#isso-já-existe-prior-art)
+
+---
+
+## Por que este projeto existe
+
+Para **aprender a construir uma IA do zero** — não para usar uma.
+
+Chamar `model.fit()` ensina a API de uma biblioteca; ensina pouco sobre o que
+realmente acontece quando um sistema aprende. Então aqui cada peça foi escrita à
+mão, e o que se aprende vem da fricção de cada uma delas:
+
+| Peça implementada à mão | O que ela ensina na prática |
+|---|---|
+| **A rede neural** (`NeuralNet.Decide`) | Que uma rede é só multiplicação de matriz + uma função de ativação. Cabe em 20 linhas. |
+| **A normalização das entradas** | Por que uma entrada que vale 1800 e outra que vale 0,3 quebram o aprendizado — e por que ângulo vira seno/cosseno. |
+| **As ativações de saída** | Que sigmoide e tanh não são enfeite: são o que prende cada ação no domínio físico certo (0..1, -1..1). |
+| **O algoritmo genético** | O trade-off central de qualquer busca: **explorar** (mutação, imigrantes) versus **explotar** (elitismo, torneio). Exagere num lado e o treino trava ou vira ruído. |
+| **A função de fitness** | A lição mais cara do projeto: *a IA otimiza exatamente o que você mede*. Está documentada como uma [saga de cinco tentativas](#como-a-ia-foi-desenvolvida-a-saga-do-fitness). |
+| **O currículo** | Por que recompensa esparsa é um muro, e por que quebrar a tarefa em etapas o derruba. |
+| **Salvar/carregar o modelo** | Que serializar pesos é onde moram os bugs chatos (aqui, a vírgula decimal do pt-BR). |
+
+Nada disso é específico de neuroevolução: normalização, design de recompensa,
+exploração vs. explotação e currículo reaparecem em aprendizado por reforço
+moderno com outros nomes. O foguete é só o pretexto para esbarrar neles.
 
 ---
 
@@ -306,6 +337,34 @@ melhor genoma de todos os tempos e os 60 cérebros atuais num arquivo texto.
 Detalhe que custou um bug: a serialização usa **`CultureInfo.InvariantCulture`** —
 numa máquina em pt-BR, `float.ToString()` gravaria vírgula decimal e o arquivo
 não voltaria a ser lido.
+
+---
+
+## Roteiro de estudo
+
+Se o seu objetivo também é aprender, esta é a ordem que faz o código render mais:
+
+1. **Jogue no modo `1`.** Sinta o problema na mão: a instabilidade aerodinâmica
+   faz o foguete capotar se você apontar para um lado e voar para outro. É *esse*
+   problema que a IA vai ter que resolver.
+2. **Leia [`Rocket.cs`](Rocket.cs)** (127 linhas). É o mundo inteiro — as regras
+   que a IA não pode burlar.
+3. **Leia `NeuralNet` em [`Ai.cs`](Ai.cs)** (~50 linhas). Veja que a rede é só
+   dois laços de multiplicação e soma. Nenhuma mágica.
+4. **Leia `Population.Evolve`.** Acompanhe o ciclo avaliar → ordenar → elite →
+   torneio → crossover → mutação. É o algoritmo genético completo, sem abstração.
+5. **Assista o modo `2` por uns minutos.** Olhe o contador de pousos e a fase do
+   currículo. Você está vendo seleção natural acontecer.
+6. **Quebre alguma coisa de propósito** e rode `dotnet run -- selftest 100`:
+   - `Elites = 0` → sem memória: a população esquece o que aprendeu.
+   - `MutationRate = 0` → sem novidade: o fitness congela na primeira geração.
+   - `MutationRate = 0.9` → ruído puro: nada se consolida.
+   - `Immigrants = 0` → converge mais rápido e trava em ótimos locais mais cedo.
+   - Remova o bônus de pouso da fitness → a IA volta a subir e nunca voltar.
+
+   Cada um desses experimentos leva um minuto e ensina mais que ler sobre o tema.
+7. **Só então** vá para um framework (PyTorch, Gym, NEAT-Python). Você vai
+   reconhecer cada peça pelo nome — e saber o que ela faz por dentro.
 
 ---
 
